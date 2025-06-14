@@ -36,15 +36,16 @@ export default async function GroupParticipants(sock, { id, participants, action
 
 ┗━━━━━━━━━━━━━━━✦
 POWERED BY INCONNU XD V2`,
-               await sock.sendMessage(m.from, {
-      image: { url: profilePictureUrl },
-      caption: menuText.trim(),
-      contextInfo: {
-        forwardingScore: 5,
-        isForwarded: true,
-        forwardedNewsletterMessageInfo: {
-          newsletterName: "INCONNU-XD-V2",
-          newsletterJid: "120363397722863547@newsletter",
+               mentions: [jid],
+               contextInfo: {
+                  externalAdReply: {
+                     title: `Welcome to the Realm`,
+                     body: `You're now part of ${groupName}`,
+                     mediaType: 1,
+                     previewType: 0,
+                     renderLargerThumbnail: true,
+                     thumbnailUrl: profilePic,
+                     sourceUrl: 'https://github.com/INCONNU-BOY/INCONNU-XD-V2'
                   }
                }
             });
@@ -68,16 +69,16 @@ POWERED BY INCONNU XD V2`,
 
 ┗━━━━━━━━━━━━━━━✦
 POWERED BY INCONNU XD V2`,
-               
-     await sock.sendMessage(m.from, {
-      image: { url: profilePictureUrl },
-      caption: menuText.trim(),
-      contextInfo: {
-        forwardingScore: 5,
-        isForwarded: true,
-        forwardedNewsletterMessageInfo: {
-          newsletterName: "INCONNU-XD-V2",
-          newsletterJid: "120363397722863547@newsletter",
+               mentions: [jid],
+               contextInfo: {
+                  externalAdReply: {
+                     title: `Goodbye, fallen soldier`,
+                     body: `Farewell from ${groupName}`,
+                     mediaType: 1,
+                     previewType: 0,
+                     renderLargerThumbnail: true,
+                     thumbnailUrl: profilePic,
+                     sourceUrl: 'https://github.com/INCONNU-BOY/INCONNU-XD-V2'
                   }
                }
             });
@@ -86,5 +87,4 @@ POWERED BY INCONNU XD V2`,
    } catch (e) {
       console.error("❌ Error in GroupParticipants:", e);
    }
-               }
-                            
+      }
