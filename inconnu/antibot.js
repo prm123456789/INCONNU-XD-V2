@@ -1,60 +1,67 @@
-import {
-  atbverifierEtatJid,
-  atbrecupererActionJid
-} from '../lib/antibot.js';
+import { antibotDB } from "../inconn/inconnutech/antibot.js";
+import { addWarn, getWarnCount, resetWarn } from "./warn.js";
 
-import { addWarn, getWarnCount, resetWarn } from '../lib/warn.js';
+const isBot = (jid, name) => {
+  return jid.endsWith("bot@c.us") || name?.toLowerCase().includes("bot") || jid.startsWith("BAE5");
+};
 
-export default async function antibotHandler(m, sock) {
+const antibotCheck = async (m, sock) => {
   try {
-    if (!m.isGroup || !m.sender) return;
+    if (!m.isGroup || !m.sender || !m.from) return;
 
-    const isEnabled = await atbverifierEtatJid(m.from);
-    if (!isEnabled) return;
+    const groupConfig = antibotDB[m.from];
+    if (!groupConfig || !groupConfig.active) return;
 
-    const action = await atbrecupererActionJid(m.from);
     const metadata = await sock.groupMetadata(m.from);
     const senderIsAdmin = metadata.participants.find(p => p.id === m.sender)?.admin;
+    const name = m.pushName || "";
 
-    const senderName = m.pushName?.toLowerCase() || "";
-    const isBot = (
-      m.sender.endsWith("bot@c.us") ||
-      senderName.includes("bot") ||
-      m.key?.id?.startsWith("BAE5")
-    );
+    if (!isBot(m.sender, name)) return;
+    if (senderIsAdmin) return;
 
-    // Do nothing if it's not a bot or if the bot is admin
-    if (!isBot || senderIsAdmin) return;
+    const mode = groupConfig.mode;
 
-    // Perform action based on antibot mode
-    if (action === "delete") {
-      await sock.sendMessage(m.from, { delete: m.key });
-      return;
-    }
-
-    if (action === "kick") {
-      await sock.groupParticipantsUpdate(m.from, [m.sender], "remove");
-      return;
-    }
-
-    if (action === "warn") {
-      const warnCount = await addWarn(m.from, m.sender);
-      if (warnCount < 3) {
+    switch (mode) {
+      case "delete":
+        await sock.sendMessage(m.from, { delete: m.key });
         await sock.sendMessage(m.from, {
-          text: `⚠️ *Warn ${warnCount}/3*\n@${m.sender.split("@")[0]} has been warned for bot behavior.`,
-          mentions: [m.sender]
+          text: `🚫 Message from bot @${m.sender.split("@")[0]} was deleted.`,
+          mentions: [m.sender],
         });
-      } else {
-        await resetWarn(m.from, m.sender);
+        break;
+
+      case "warn":
+        const warnCount = await addWarn(m.from, m.sender);
+        if (warnCount < 3) {
+          await sock.sendMessage(m.from, {
+            text: `⚠️ Bot detected: @${m.sender.split("@")[0]}\n*Warning ${warnCount}/3*`,
+            mentions: [m.sender],
+          });
+        } else {
+          await resetWarn(m.from, m.sender);
+          await sock.groupParticipantsUpdate(m.from, [m.sender], "remove");
+          await sock.sendMessage(m.from, {
+            text: `❌ Bot @${m.sender.split("@")[0]} removed after 3 warnings.`,
+            mentions: [m.sender],
+          });
+        }
+        break;
+
+      case "kick":
         await sock.groupParticipantsUpdate(m.from, [m.sender], "remove");
         await sock.sendMessage(m.from, {
-          text: `🚫 *Bot Kicked*\n@${m.sender.split("@")[0]} reached 3 warns and has been removed.`,
-          mentions: [m.sender]
+          text: `❌ Bot @${m.sender.split("@")[0]} was kicked instantly.`,
+          mentions: [m.sender],
         });
-      }
+        break;
+
+      default:
+        break;
     }
 
-  } catch (e) {
-    console.error("ANTIBOT ERROR:", e);
+  } catch (err) {
+    console.error("AntiBot Middleware Error:", err);
   }
-}
+};
+
+export default antibotCheck;
