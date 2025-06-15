@@ -1,22 +1,40 @@
-import { getAllSudoNumbers } from '../../lib/sudo.js';
+import { addSudoNumber } from '../../lib/sudo.js';
+import config from '../../config.cjs';
 
-const sudoList = async (m, Matrix) => {
+const sudo = async (m, gss) => {
   try {
-    const list = await getAllSudoNumbers();
+    const botNumber = await gss.decodeJid(gss.user.id);
+    const prefix = config.PREFIX;
+    const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
+    const text = m.body.slice(prefix.length + cmd.length).trim();
 
-    if (list.length === 0) {
-      return m.reply(`🚫 *No SUDO users found in the database.*`);
+    const validCommands = ['sudo', 'addsudo', 'addadmin'];
+    if (!validCommands.includes(cmd)) return;
+
+    const sender = m.sender;
+    const isOwner = sender === config.OWNER_NUMBER + '@s.whatsapp.net';
+    if (!isOwner) return m.reply("*σиℓу σωиєя ¢αи υѕє тнιѕ ¢σммαη∂ !*");
+
+    // cas 1: reply à quelqu’un
+    let jidTarget;
+    if (m.quoted) {
+      jidTarget = m.quoted.sender;
+    } else {
+      // cas 2: taper le numéro
+      const number = text.replace(/[^0-9]/g, '');
+      if (!number) return m.reply("*ρℓєαѕє яєρℓу тσ α υѕєя σя єитєя иυмвєя !*");
+      jidTarget = number + '@s.whatsapp.net';
     }
 
-    const formatted = list.map((jid, i) => `*${i + 1}.* wa.me/${jid.replace(/@.+/, '')}`).join("\n");
+    await addSudoNumber(jidTarget);
+    return m.reply(`✅ *@${jidTarget.split("@")[0]} ιѕ иσω α ѕυ∂σ υѕєя !*`, null, {
+      mentions: [jidTarget]
+    });
 
-    return m.reply(`╭──〔 *SUDO LIST* 〕──╮\n\n${formatted}\n\n╰───────────────╯`);
   } catch (e) {
-    console.error(e);
-    return m.reply("❌ Error while retrieving the sudo list.");
+    console.error("❌ Error in .sudo command:", e);
+    m.reply("*єяяσя σ¢¢υяє∂ ωнιℓє α∂∂ιиg ѕυ∂σ...*");
   }
 };
 
-export const cmd = ['sudolist', 'listsudo', 'sudo list'];
-export const tags = ['owner'];
-export default sudoList;
+export default sudo;
