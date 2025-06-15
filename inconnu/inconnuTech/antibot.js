@@ -1,6 +1,6 @@
 import fs from "fs";
 import config from "../config.cjs";
-const dbPath = "./database/antibot.json";
+const dbPath = "./inconnu/antibot.js";
 
 let antibotDB = fs.existsSync(dbPath)
   ? JSON.parse(fs.readFileSync(dbPath))
