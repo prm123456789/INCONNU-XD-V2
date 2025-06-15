@@ -1,69 +1,63 @@
-import config from "../../config.cjs";
+import fs from "fs";
+import config from "../config.cjs";
+const dbPath = "./database/antibot.json";
 
-const antibotDB = new Map(); // Temporary in-memory storage
+let antibotDB = fs.existsSync(dbPath)
+  ? JSON.parse(fs.readFileSync(dbPath))
+  : {};
 
-const antibot = async (m, gss) => {
+const saveDB = () => fs.writeFileSync(dbPath, JSON.stringify(antibotDB, null, 2));
+
+const antibot = async (m, sock) => {
   try {
-    const cmd = m.body.toLowerCase().trim();
+    const prefix = config.PREFIX;
+    const body = m.body?.toLowerCase()?.trim();
+    if (!body || !body.startsWith(prefix)) return;
 
-    // Enable antibot
-    if (cmd === "antibot on") {
-      if (!m.isGroup) return m.reply("*Command reserved for groups only*\n\n> *Try it in a group*");
+    const command = body.slice(prefix.length).trim();
 
-      const groupMetadata = await gss.groupMetadata(m.from);
-      const participants = groupMetadata.participants;
-      const senderAdmin = participants.find(p => p.id === m.sender)?.admin;
-
-      if (!senderAdmin) {
-        return m.reply("*Command for admins only*\n\n> *Request admin role*");
-      }
-
-      antibotDB.set(m.from, true);
-      return m.reply("*Antibot is now activated for this group.*\n\n> *Be warned: Do not use bot commands.*");
+    if (command === "antibot") {
+      return m.reply(`*╭─❍『 ANTIBOT USAGE 』❍\n│  ➤ ${prefix}antibot on\n│  ➤ ${prefix}antibot off\n│  ➤ ${prefix}antibot mode delete\n│  ➤ ${prefix}antibot mode warn\n│  ➤ ${prefix}antibot mode kick\n│\n│  Control how bots are handled.\n╰───────────────━⊷*`);
     }
 
-    // Disable antibot
-    if (cmd === "antibot off") {
-      if (!m.isGroup) return m.reply("*Command only for groups!*\n\n> *Please try it in a group*");
+    if (!m.isGroup) return m.reply("*❌ This command works only in group chats.*");
 
-      const groupMetadata = await gss.groupMetadata(m.from);
-      const participants = groupMetadata.participants;
-      const senderAdmin = participants.find(p => p.id === m.sender)?.admin;
+    const metadata = await sock.groupMetadata(m.from);
+    const isAdmin = metadata.participants.find(p => p.id === m.sender)?.admin;
+    if (!isAdmin) return m.reply("*❌ Admins only!*");
 
-      if (!senderAdmin) {
-        return m.reply("*Only admins can disable antibot!*\n\n> *Smile in pain*");
-      }
-
-      antibotDB.delete(m.from);
-      return m.reply("*Antibot is now disabled for this group.*\n\n> *I'll be back soon*");
+    if (command === "antibot on") {
+      antibotDB[m.from] = { active: true, mode: "delete" };
+      saveDB();
+      return m.reply("*✅ AntiBot is now ON with 'delete' mode.*");
     }
 
-    // **🔹 AUTO-DETECT BOT COMMANDS AND DELETE THEM**
-    if (antibotDB.get(m.from)) {
-      const botCommandRegex = /\.menu|\.help|\.ping|\.play|\.owner|\.img|\.repo|\.sc|\.start|\.command/gi;
-      if (botCommandRegex.test(m.body)) {
-        // Delete the message
-        await gss.sendMessage(m.from, { delete: m.key });
-
-        // Warn the user
-        await m.reply(`*Bot commands are not allowed in this group!*\n\n> *This is your first warning.*`);
-
-        // Track warned users
-        const warnedUsers = antibotDB.get(m.from + "_warned") || new Set();
-        if (warnedUsers.has(m.sender)) {
-          // Remove the user if they repeat the violation
-          await gss.groupParticipantsUpdate(m.from, [m.sender], 'remove');
-          return m.reply(`*${m.sender.split('@')[0]} has been removed for using bot commands.*`);
-        } else {
-          warnedUsers.add(m.sender);
-          antibotDB.set(m.from + "_warned", warnedUsers);
-        }
-      }
+    if (command === "antibot off") {
+      delete antibotDB[m.from];
+      saveDB();
+      return m.reply("*❌ AntiBot is now OFF.*");
     }
-  } catch (error) {
-    console.error("Error in Antibot:", error);
-    m.reply("*⚠️ An error occurred while processing Antibot.*\n\n> *Please try again later*");
+
+    if (command.startsWith("antibot mode ")) {
+      const mode = command.split(" ")[2];
+      if (!["delete", "warn", "kick"].includes(mode)) {
+        return m.reply("*❌ Invalid mode. Choose: delete, warn or kick.*");
+      }
+
+      if (!antibotDB[m.from]) {
+        antibotDB[m.from] = { active: true, mode: mode };
+      } else {
+        antibotDB[m.from].mode = mode;
+      }
+      saveDB();
+      return m.reply(`*✅ AntiBot mode updated to '${mode}'.*`);
+    }
+
+  } catch (err) {
+    console.error("AntiBot Plugin Error:", err);
+    m.reply("*⚠️ Something went wrong with AntiBot plugin.*");
   }
 };
 
 export default antibot;
+export { antibotDB, saveDB };
