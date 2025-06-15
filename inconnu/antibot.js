@@ -1,4 +1,4 @@
-import { antibotDB } from "../inconn/inconnutech/antibot.js";
+import { antibotDB } from "../inconnu/inconnuTech/antibot.js";
 import { addWarn, getWarnCount, resetWarn } from "./warn.js";
 
 const isBot = (jid, name) => {
