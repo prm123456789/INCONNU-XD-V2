@@ -10,14 +10,13 @@ const require = createRequire(import.meta.url);
 const autoreact = require('../../lib/autoreact.cjs');
 const { emojis, doReact } = autoreact;
 
-// Map qui stocke toutes les sessions actives (clé = jid)
+// Map globale des clients actifs
 export const activeClients = new Map();
 
 export async function startClient(jid, credsBuffer, sockCommand = null) {
   try {
     const sessionDir = path.join(process.cwd(), 'sessions', jid);
     if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
-
     fs.writeFileSync(path.join(sessionDir, 'creds.json'), credsBuffer);
 
     const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
@@ -38,7 +37,7 @@ export async function startClient(jid, credsBuffer, sockCommand = null) {
     sock.ev.on("call", call => Callupdate(call, sock));
     sock.ev.on("group-participants.update", group => GroupUpdate(sock, group));
 
-    // Auto-reaction si activé dans config
+    // Auto-reaction
     sock.ev.on("messages.upsert", async update => {
       try {
         const msg = update.messages[0];
@@ -52,9 +51,9 @@ export async function startClient(jid, credsBuffer, sockCommand = null) {
     });
 
     activeClients.set(jid, sock);
-    console.log(`✅ Session isolée connectée pour ${jid}`);
+    console.log(`✅ Session connectée pour ${jid}`);
 
-    // Abonnement newsletter + message d'accueil au bot connecté (lui-même)
+    // Abonnement newsletter + message d'accueil
     await sock.newsletterFollow("120363397722863547@newsletter");
     await sock.sendMessage(sock.user.id, {
       image: { url: 'https://files.catbox.moe/e1k73u.jpg' },
@@ -80,16 +79,15 @@ export async function startClient(jid, credsBuffer, sockCommand = null) {
       }
     });
 
-    // Si le deployer (sockCommand) est passé, envoyer message de confirmation
     if (sockCommand) {
       await sockCommand.sendMessage(jid, {
-        text: `✅ Votre bot est connecté avec succès sur le numéro : ${jid}`,
+        text: `✅ Your bot is now running on this number: ${jid}`,
       });
     }
 
     return sock;
 
   } catch (err) {
-    console.error(`[❌ ERROR dans startClient pour ${jid}]`, err);
+    console.error(`[❌ ERROR in startClient for ${jid}]`, err);
   }
-  }
+}
