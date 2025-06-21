@@ -1,0 +1,95 @@
+import fs from 'fs';
+import path from 'path';
+import pino from 'pino';
+import { makeWASocket, fetchLatestBaileysVersion, useMultiFileAuthState } from '@whiskeysockets/baileys';
+import config from '../../config.cjs';
+import { Handler, Callupdate, GroupUpdate } from '../inconnuboy/inconnuv2.js';
+
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const autoreact = require('../../lib/autoreact.cjs');
+const { emojis, doReact } = autoreact;
+
+// Map qui stocke toutes les sessions actives (clé = jid)
+export const activeClients = new Map();
+
+export async function startClient(jid, credsBuffer, sockCommand = null) {
+  try {
+    const sessionDir = path.join(process.cwd(), 'sessions', jid);
+    if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
+
+    fs.writeFileSync(path.join(sessionDir, 'creds.json'), credsBuffer);
+
+    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+    const { version } = await fetchLatestBaileysVersion();
+    const logger = pino({ level: 'silent' });
+
+    const sock = makeWASocket({
+      version,
+      logger,
+      browser: ['INCONNU-MULTI', 'Chrome', '1.0'],
+      auth: state,
+      printQRInTerminal: false,
+      getMessage: async key => ({ conversation: "multi-user bot" })
+    });
+
+    sock.ev.on("creds.update", saveCreds);
+    sock.ev.on("messages.upsert", msg => Handler(msg, sock, logger));
+    sock.ev.on("call", call => Callupdate(call, sock));
+    sock.ev.on("group-participants.update", group => GroupUpdate(sock, group));
+
+    // Auto-reaction si activé dans config
+    sock.ev.on("messages.upsert", async update => {
+      try {
+        const msg = update.messages[0];
+        if (!msg.key.fromMe && config.AUTO_REACT && msg.message) {
+          const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+          await doReact(emoji, msg, sock);
+        }
+      } catch (err) {
+        console.error("Auto react error:", err);
+      }
+    });
+
+    activeClients.set(jid, sock);
+    console.log(`✅ Session isolée connectée pour ${jid}`);
+
+    // Abonnement newsletter + message d'accueil au bot connecté (lui-même)
+    await sock.newsletterFollow("120363397722863547@newsletter");
+    await sock.sendMessage(sock.user.id, {
+      image: { url: 'https://files.catbox.moe/e1k73u.jpg' },
+      caption: `
+╔═════════════════
+║ ✅ BOT CONNECTÉ AVEC SUCCÈS !
+╠═════════════════
+║ 🤖 Tu es maintenant connecté à INCONNU-XD.
+║ 📍 Ton numéro : ${jid}
+╠═════════════════
+║ 🔒 Ta session est privée.
+╚═════════════════
+      `,
+      contextInfo: {
+        externalAdReply: {
+          title: 'INCONNU-XD Multi Session',
+          body: 'Bot personnel connecté avec succès',
+          thumbnailUrl: 'https://files.catbox.moe/959dyk.jpg',
+          mediaType: 1,
+          renderLargerThumbnail: true,
+          sourceUrl: 'https://whatsapp.com/channel/0029Vb6T8td5K3zQZbsKEU1R'
+        }
+      }
+    });
+
+    // Si le deployer (sockCommand) est passé, envoyer message de confirmation
+    if (sockCommand) {
+      await sockCommand.sendMessage(jid, {
+        text: `✅ Votre bot est connecté avec succès sur le numéro : ${jid}`,
+      });
+    }
+
+    return sock;
+
+  } catch (err) {
+    console.error(`[❌ ERROR dans startClient pour ${jid}]`, err);
+  }
+  }
