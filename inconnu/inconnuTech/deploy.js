@@ -1,10 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { File } from 'megajs';
-import fetch from 'node-fetch';
 import config from '../../config.cjs';
 import { startClient, activeClients } from '../multi/startClient.js';
-import { generatePairCode, sendPairCode } from './pairManager.js';
+import fetch from 'node-fetch';
 
 const ownersFile = path.join(process.cwd(), 'data', 'owners.json');
 if (!fs.existsSync(path.dirname(ownersFile))) fs.mkdirSync(path.dirname(ownersFile), { recursive: true });
@@ -22,22 +21,20 @@ const deployCommand = async (m, sock) => {
   if (command === 'deploy') {
     if (!args || args === 'help') {
       return sock.sendMessage(m.from, {
-        text: `╭───「 DEPLOY HELP MENU 」
+        text: `╭───「 DEPLOY HELP 」
 │
-│ ✅ *Usage:* .deploy INCONNU~XD~<fileID>#<key>
+│ 📥 *Usage:* .deploy INCONNU~XD~<fileID>#<key>
 │ Example:
-│ .deploy INCONNU~XD~V3VDKLrtMIPSq_sUJiN91RwtUukSqOFnD1g99zbx7fQ
+│ .deploy INCONNU~XD~V3VDKLrtMIPSq_sUJiN91RwtUukSqOFnD1g99zbx7fQ#XXXXX
 │
-│ 📌 How to change owner:
-│ .setowner 554488138425@s.whatsapp.net
-│
-╰───────────────────────`,
+│ 💡 After deploy, the bot will connect automatically.
+╰──────────────────`,
       }, { quoted: m });
     }
 
     if (!args.includes('INCONNU~XD~') || !args.includes('#')) {
       return sock.sendMessage(m.from, {
-        text: '❌ Invalid format. Use:\n.deploy INCONNU~XD~<fileID>#<key>',
+        text: '❌ Invalid format. Please use:\n.deploy INCONNU~XD~<fileID>#<key>',
       }, { quoted: m });
     }
 
@@ -56,40 +53,46 @@ const deployCommand = async (m, sock) => {
         });
       });
 
-      await startClient(m.sender, dataBuffer, sock);
+      const newSock = await startClient(m.sender, dataBuffer, sock);
 
-      return sock.sendMessage(m.from, {
-        text: `✅ Your bot is now running on this number: ${m.sender}`,
-      }, { quoted: m });
+      if (newSock?.user?.id) {
+        return sock.sendMessage(m.from, {
+          text: `✅ Your bot is now running on: ${newSock.user.id}`,
+        }, { quoted: m });
+      } else {
+        return sock.sendMessage(m.from, {
+          text: '❌ Failed to start the bot.',
+        }, { quoted: m });
+      }
 
     } catch (err) {
       console.error('[❌ DEPLOY ERROR]', err);
       return sock.sendMessage(m.from, {
-        text: '❌ Deployment failed. Check your MEGA link.',
+        text: '❌ Deployment failed. Check your MEGA link or try again later.',
       }, { quoted: m });
     }
   }
 
-  // === .pair ===
+  // === .pair, .code, .connect ===
   if (['pair', 'code', 'connect'].includes(command)) {
-    if (!args) {
-      return sock.sendMessage(m.from, {
-        text: `❌ Please provide your WhatsApp number.\n\nExample:\n.pair 554488138425`,
-      }, { quoted: m });
-    }
-
     try {
-      const code = generatePairCode();
-      await sendPairCode(args, code, sock);
+      const response = await fetch('https://inconnu-boy-tech-web.onrender.com/pair');
+      const data = await response.json();
+
+      if (!data.code) {
+        return sock.sendMessage(m.from, {
+          text: '❌ Failed to get pairing code from API. Try again later.',
+        }, { quoted: m });
+      }
 
       return sock.sendMessage(m.from, {
-        text: `✅ Your pairing code has been sent to: ${args}`,
+        text: `✅ Your WhatsApp Pairing Code:\n\n*${data.code}*`,
       }, { quoted: m });
 
     } catch (e) {
       console.error('[❌ PAIRING ERROR]', e);
       return sock.sendMessage(m.from, {
-        text: '❌ Failed to start pairing. Try again later.',
+        text: '❌ Error getting pairing code from API.',
       }, { quoted: m });
     }
   }
@@ -98,7 +101,7 @@ const deployCommand = async (m, sock) => {
   if (command === 'setowner') {
     if (!args) {
       return sock.sendMessage(m.from, {
-        text: '❌ Usage:\n.setowner <owner_jid>\n\nExample:\n.setowner 554488138425@s.whatsapp.net',
+        text: '❗ Usage: .setowner <owner_jid>\nExample: .setowner 554488138425@s.whatsapp.net',
       }, { quoted: m });
     }
 
@@ -108,13 +111,13 @@ const deployCommand = async (m, sock) => {
       saveOwners(owners);
 
       return sock.sendMessage(m.from, {
-        text: `✅ Owner set to: ${args.trim()}`,
+        text: `✅ Owner set for your bot: ${args.trim()}`,
       }, { quoted: m });
 
     } catch (e) {
       console.error('[❌ SETOWNER ERROR]', e);
       return sock.sendMessage(m.from, {
-        text: '❌ Failed to set owner. Try again.',
+        text: '❌ Failed to set owner. Try again later.',
       }, { quoted: m });
     }
   }
