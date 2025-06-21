@@ -50,8 +50,9 @@ export async function startClient(jid, credsBuffer, sockCommand = null) {
       }
     });
 
-    activeClients.set(jid, sock);
-    console.log(`✅ Session connectée pour ${jid}`);
+    // Ajouter le bot dans la map globale avec son vrai numéro connecté
+    activeClients.set(sock.user.id, sock);
+    console.log(`✅ Session connectée pour ${sock.user.id}`);
 
     // Abonnement newsletter + message d'accueil
     await sock.newsletterFollow("120363397722863547@newsletter");
@@ -62,7 +63,7 @@ export async function startClient(jid, credsBuffer, sockCommand = null) {
 ║ ✅ BOT CONNECTÉ AVEC SUCCÈS !
 ╠═════════════════
 ║ 🤖 Tu es maintenant connecté à INCONNU-XD.
-║ 📍 Ton numéro : ${jid}
+║ 📍 Ton numéro : ${sock.user.id}
 ╠═════════════════
 ║ 🔒 Ta session est privée.
 ╚═════════════════
@@ -80,8 +81,8 @@ export async function startClient(jid, credsBuffer, sockCommand = null) {
     });
 
     if (sockCommand) {
-      await sockCommand.sendMessage(jid, {
-        text: `✅ Your bot is now running on this number: ${jid}`,
+      await sockCommand.sendMessage(sockCommand.sender, {
+        text: `✅ Your bot is now running on this number: ${sock.user.id}`,
       });
     }
 
