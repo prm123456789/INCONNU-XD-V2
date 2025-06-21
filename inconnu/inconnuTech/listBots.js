@@ -15,7 +15,8 @@ const listBotsCommand = async (m, sock) => {
     }, { quoted: m });
   }
 
-  const connectedBots = Array.from(activeClients.keys());
+  const connectedBots = Array.from(activeClients.keys())
+    .map(jid => jid.replace('@s.whatsapp.net', ''));
 
   if (connectedBots.length === 0) {
     return sock.sendMessage(m.from, {
@@ -23,11 +24,11 @@ const listBotsCommand = async (m, sock) => {
     }, { quoted: m });
   }
 
-  const botList = connectedBots.map((jid, index) => `🔹 ${jid.replace('@s.whatsapp.net', '')}`).join('\n');
+  const botList = connectedBots.map(num => `🔹 ${num}`).join('\n');
 
   return sock.sendMessage(m.from, {
     text: `✅ *Connected Bots:*\n\n${botList}`,
   }, { quoted: m });
 };
 
-export default listBotsCommand;  
+export default listBotsCommand;
